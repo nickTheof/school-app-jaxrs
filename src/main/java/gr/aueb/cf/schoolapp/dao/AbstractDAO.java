@@ -77,8 +77,8 @@ public abstract class AbstractDAO<T extends IdentifiableEntity> implements IGene
         CriteriaBuilder cb = em.getCriteriaBuilder();
         CriteriaQuery<T> builder = cb.createQuery(persistentClass);
         Root<T> root = builder.from(persistentClass);
-        ParameterExpression<Object> parameterExpression = cb.parameter(Object.class, fieldName);
-        builder.select(root).where(cb.equal(root.get(fieldName), parameterExpression));
+        ParameterExpression<Object> parameterExpression = cb.parameter(Object.class, buildParameterAlias(fieldName));
+        builder.select(root).where(cb.equal(root.get(buildParameterAlias(fieldName)), parameterExpression));
         List<T> results = em.createQuery(builder).setParameter(fieldName, value).getResultList();
         if (results.isEmpty()) {
             return Optional.empty();
@@ -111,7 +111,7 @@ public abstract class AbstractDAO<T extends IdentifiableEntity> implements IGene
         return query.getResultList();
     }
 
-    private static EntityManager getEntityManager() {
+    protected static EntityManager getEntityManager() {
         return JPAHelper.getEntityManager();
     }
 

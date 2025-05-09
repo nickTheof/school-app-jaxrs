@@ -18,7 +18,7 @@ public class JPAHelper {
     private static final Map<String, Object> properties = new HashMap<>();
 
     static {
-        config.setJdbcUrl(System.getenv("SCHOOL_DB_HOST") + ":" + System.getenv("SCHOOL_DB_PORT") +
+        config.setJdbcUrl(System.getenv("SCHOOL7_DB_HOST") + ":" + System.getenv("SCHOOL7_DB_PORT") +
                 "/" + System.getenv("SCHOOL_DB_DATABASE") + "?serverTimezone=UTC");
         config.setUsername(System.getenv("SCHOOL7_DB_USERNAME"));
         config.setPassword(System.getenv("SCHOOL7_DB_PASSWORD"));

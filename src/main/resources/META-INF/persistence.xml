@@ -13,6 +13,12 @@
             <property name="hibernate.show_sql" value="true" />
             <property name="hibernate.format_sql" value="true" />
             <property name="hibernate.connection.driver" value="com.mysql.cj.jdbc.Driver" />
+<!--            FOR SQL EXPORT-->
+<!--            <property name="jakarta.persistence.schema-generation.scripts.action" value="create"/>-->
+<!--            <property name="jakarta.persistence.schema-generation.scripts.create-target" value="target/sql/schema.sql"/>-->
+<!--            FOR PREVENT DB CHANGES-->
+<!--            <property name="jakarta.persistence.schema-generation.database.action" value="none"/>-->
+
             <property name="hibernate.hbm2ddl.auto" value="update" />
         </properties>
     </persistence-unit>
