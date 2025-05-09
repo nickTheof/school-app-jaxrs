@@ -1,15 +1,4 @@
 package gr.aueb.cf.schoolapp.dto;
 
-import lombok.*;
+public record TeacherReadOnlyDTO(Long id, String firstname, String lastname, String vat) {}
 
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
-@Getter
-@Setter
-public class TeacherReadOnlyDTO {
-    private Long id;
-    private String firstname;
-    private String lastname;
-    private String vat;
-}

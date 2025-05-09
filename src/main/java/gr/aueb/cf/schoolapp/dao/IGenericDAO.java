@@ -15,6 +15,5 @@ public interface IGenericDAO<T> {
     List<T> getAll();
     List<? extends T> getByCriteria(Map<String, Object> criteria);
     <K extends T> List<K> getByCriteria(Class<K> clazz, Map<String, Object> criteria);
-
     <K extends T> List<K> getByCriteriaPaginated(Class<K> clazz, Map<String, Object> criteria, Integer page, Integer size);
 }

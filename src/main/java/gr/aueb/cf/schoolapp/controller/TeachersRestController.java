@@ -52,7 +52,7 @@ public class TeachersRestController {
         TeacherReadOnlyDTO readOnlyDTO = teacherService.insertTeacher(dto);
         return Response.created(uriInfo
                                     .getAbsolutePathBuilder()
-                                    .path(readOnlyDTO.getId().toString()).build())
+                                    .path(readOnlyDTO.id().toString()).build())
                                 .entity(readOnlyDTO)
                                 .build();
     }
