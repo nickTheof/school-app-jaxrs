@@ -31,26 +31,24 @@ public abstract class AbstractDAO<T extends IdentifiableEntity> implements IGene
 
     @Override
     public Optional<T> update(T t) {
-        EntityManager em = getEntityManager();
-        em.merge(t);
-        return Optional.of(t);
+        Optional<T> toUpdate = getById(t.getId());
+        if (toUpdate.isEmpty()) {
+            return Optional.empty();
+        } else {
+            getEntityManager().merge(t);
+            return Optional.of(t);
+        }
     }
 
     @Override
     public void delete(Object id) {
-        EntityManager em = getEntityManager();
         Optional<T> toDelete = getById(id);
-        toDelete.ifPresent(em::remove);
+        toDelete.ifPresent(getEntityManager()::remove);
     }
 
     @Override
     public Long count() {
-        EntityManager em = getEntityManager();
-        CriteriaBuilder cb = em.getCriteriaBuilder();
-        CriteriaQuery<Long> selectQuery = cb.createQuery(Long.class);
-        Root<T> rootEntity = selectQuery.from(getPersistentClass());
-        selectQuery.select(cb.count(rootEntity));
-        return em.createQuery(selectQuery).getSingleResult();
+        return getEntityManager().createQuery("SELECT COUNT(e) FROM " + persistentClass.getSimpleName() + " e", Long.class).getSingleResult();
     }
 
     @Override
@@ -73,23 +71,15 @@ public abstract class AbstractDAO<T extends IdentifiableEntity> implements IGene
 
     @Override
     public Optional<T> findByField(String fieldName, Object value) {
-        EntityManager em = getEntityManager();
-        CriteriaBuilder cb = em.getCriteriaBuilder();
-        CriteriaQuery<T> builder = cb.createQuery(persistentClass);
-        Root<T> root = builder.from(persistentClass);
-        ParameterExpression<Object> parameterExpression = cb.parameter(Object.class, buildParameterAlias(fieldName));
-        builder.select(root).where(cb.equal(root.get(buildParameterAlias(fieldName)), parameterExpression));
-        List<T> results = em.createQuery(builder).setParameter(fieldName, value).getResultList();
-        if (results.isEmpty()) {
-            return Optional.empty();
-        } else {
-            return Optional.of(results.get(0));
-        }
+        String sql = "SELECT e FROM " + persistentClass.getSimpleName() + " e WHERE e." + fieldName + ":= value";
+        TypedQuery<T> query = getEntityManager().createQuery(sql, persistentClass);
+        query.setParameter("value", value);
+        return query.getResultList().stream().findFirst();
     }
 
     @Override
     public List<T> getAll() {
-        return getByCriteria(getPersistentClass(), Collections.<String, Object>emptyMap());
+        return getByCriteria(getPersistentClass(), Collections.emptyMap());
     }
 
     @Override
@@ -106,8 +96,10 @@ public abstract class AbstractDAO<T extends IdentifiableEntity> implements IGene
     @Override
     public <K extends T> List<K> getByCriteriaPaginated(Class<K> clazz, Map<String, Object> criteria, Integer page, Integer size) {
         TypedQuery<K> query = getByCriteriaQuery(clazz, criteria);
-        query.setFirstResult((page - 1) * size);
-        query.setMaxResults(size);
+        if (page != null && size != null) {
+            query.setFirstResult(page * size);      // skip
+            query.setMaxResults(size);
+        }
         return query.getResultList();
     }
 
@@ -115,14 +107,53 @@ public abstract class AbstractDAO<T extends IdentifiableEntity> implements IGene
         return JPAHelper.getEntityManager();
     }
 
-    protected List<Predicate> getPredicatesList(CriteriaBuilder builder, Root<? extends T> entityRoot,  Map<String, Object> criteria) {
+    @SuppressWarnings("unchecked")
+    protected <K extends T> List<Predicate> getPredicatesList(CriteriaBuilder builder, Root<K> entityRoot, Map<String, Object> criteria) {
         List<Predicate> predicates = new ArrayList<>();
-        for (Map.Entry<String, Object> entry: criteria.entrySet()) {
+
+        for (Map.Entry<String, Object> entry : criteria.entrySet()) {
             String key = entry.getKey();
             Object value = entry.getValue();
-            ParameterExpression<?> val = builder.parameter(value.getClass(), buildParameterAlias(key));
-            Predicate predicateLike = builder.like((Expression<String>) resolvePath(entityRoot, key), (Expression<String>) val);
-            predicates.add(predicateLike);
+
+            // Handling the cases where the value is a List, Map or a "isNull" condition
+            if (value instanceof List) {
+                Path<?> path = resolvePath(entityRoot, key);
+                CriteriaBuilder.In<Object> inClause = builder.in(path);
+                for (Object v : (List<?>) value) {
+                    inClause.value(v);
+                }
+                predicates.add(inClause);
+            } else if (value instanceof Map) {
+                // For 'BETWEEN' condition
+                Map<String, Object> mapValue = (Map<String, Object>) value;
+                if (mapValue.containsKey("from") && mapValue.containsKey("to")) {
+                    Object from = mapValue.get("from");
+                    Object to = mapValue.get("to");
+
+                    if (from instanceof Comparable && to instanceof Comparable) {
+                        Expression<? extends Comparable<Object>> path =
+                                (Expression<? extends Comparable<Object>>) resolvePath(entityRoot, key);
+
+                        predicates.add(builder.between(path, (Comparable<Object>) from, (Comparable<Object>) to));
+                    }
+                }
+            } else if ("isNull".equals(value)) {
+                // For 'IS NULL' condition
+                predicates.add(builder.isNull(resolvePath(entityRoot, key)));
+            } else if ("isNotNull".equals(value)) {
+                // For 'IS NOT NULL' condition
+                predicates.add(builder.isNotNull(resolvePath(entityRoot, key)));
+            } else if (value instanceof String && ((String) value).contains("%")) {
+                // Treat as LIKE pattern (e.g., "Jo%")
+                predicates.add(
+                        builder.like(
+                                builder.lower((Expression<String>) resolvePath(entityRoot, key)),
+                                ((String) value).toLowerCase()
+                        ));
+            } else {
+                // For '=' condition (default case)
+                predicates.add(builder.equal(resolvePath(entityRoot, key), value));
+            }
         }
         return predicates;
     }
@@ -140,10 +171,17 @@ public abstract class AbstractDAO<T extends IdentifiableEntity> implements IGene
         return malformedAlias.replaceAll("\\.", "");
     }
 
-    protected void addParametersToQuery(TypedQuery<?> query, Map<String, Object> criteria) {
-        for (Map.Entry<String, Object> entry: criteria.entrySet()) {
+    protected void addParametersToQuery(TypedQuery<? extends T> query, Map<String, Object> criteria) {
+        for (Map.Entry<String, Object> entry : criteria.entrySet()) {
             Object value = entry.getValue();
-            query.setParameter(buildParameterAlias(entry.getKey()), value + "%");
+            if (value instanceof List || value instanceof Map) {
+                // Handle complex cases like IN or BETWEEN that need special parameter setting
+                // (    Do not add % for LIKE here)
+                query.setParameter(buildParameterAlias(entry.getKey()), value);
+            } else {
+                // Adding '%' for LIKE operations if needed
+                query.setParameter(buildParameterAlias(entry.getKey()) , value + "%");
+            }
         }
     }
 
