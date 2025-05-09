@@ -53,7 +53,7 @@ public class TeacherServiceImpl implements ITeacherService {
     public TeacherReadOnlyDTO updateTeacher(TeacherUpdateDTO teacherUpdateDTO) throws EntityNotFoundException, EntityInvalidArgumentException {
         try {
             JPAHelper.beginTransaction();
-            if (teacherDAO.getByVat(teacherUpdateDTO.getVat()).isEmpty()) {
+            if (teacherDAO.getByVat(teacherUpdateDTO.getVat()).isEmpty() || teacherDAO.getById(teacherUpdateDTO.getId()).isEmpty()) {
                 throw new EntityNotFoundException("Teacher", "Teacher with vat " + teacherUpdateDTO.getVat() + " not found for update.");
             }
             Teacher teacher = Mapper.mapToTeacher(teacherUpdateDTO);
