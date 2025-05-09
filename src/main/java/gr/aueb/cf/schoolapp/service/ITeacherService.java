@@ -19,4 +19,7 @@ public interface ITeacherService {
     void deleteTeacher(Long id) throws EntityNotFoundException;
     TeacherReadOnlyDTO getTeacherById(Long id) throws EntityNotFoundException;
     List<TeacherReadOnlyDTO> getTeachersByCriteria(Map<String, Object> criteria);
+    List<TeacherReadOnlyDTO> getAllTeachers();
+    long getTeachersCountByCriteria(Map<String, Object> criteria);
+    List<TeacherReadOnlyDTO> getTeachersByCriteriaPaginated(Map<String, Object> criteria, Integer page, Integer size);
 }
